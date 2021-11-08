@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from .utils import encrypt, decrypt
 from .validators import validate_card_expiry, card_number_validator, cvv_validator, card_type_choice_validator, card_regexes
 
 class CardDetail(models.Model):
@@ -29,6 +30,7 @@ class CardDetail(models.Model):
     updated_on = models.DateTimeField(auto_now = True)
     
     def save(self, *args, **kwargs):
+        self.card_number = encrypt(self.card_number)
         """
             # TODO
             1. Schedule a task to 24th hour, that if this instance is not 
@@ -39,13 +41,17 @@ class CardDetail(models.Model):
         """
         super().save(*args, **kwargs)
 
+    @property
+    def card_number_plain(self):
+        return decrypt(self.card_number).decode()
+
     def __str__(self) -> str:
         return f"{self.user.username} {self.card_type} card"
 
     class Meta:
         ordering = ['-created_on']
 
-@receiver(pre_save, sender = CardDetail)
+# @receiver(pre_save, sender = CardDetail)
 def card_type_from_card_number(sender, instance, *args, **kwargs):
     card_number = instance.card_number
     for regex in card_regexes:
